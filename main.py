@@ -33,19 +33,32 @@ def health():
 
 @app.on_event("startup")
 def seed_defaults():
-    """Seed default admin user and platform settings on first run."""
+    """Seed default users and platform settings on first run."""
     db = sessionLocal()
     try:
-        # Seed admin
-        if not db.query(models.User).filter(models.User.email == "admin@swiftcourier.com").first():
-            db.add(models.User(
-                full_name="Admin",
-                email="admin@swiftcourier.com",
-                phone="01700000000",
-                hashed_password=hash_password("Admin12345"),
-                role="admin",
-                is_verified=True,
-            ))
+        # Seed users
+        seed_users = [
+            ("Admin User", "admin@swiftcourier.com", "01700000000", "Admin12345", "admin"),
+            ("Agent User", "agent@swiftcourier.com", "01800000000", "Agent12345", "agent"),
+            ("Customer User", "customer@swiftcourier.com", "01900000000", "Customer12345", "customer"),
+        ]
+        for name, email, phone, pwd, role in seed_users:
+            existing = db.query(models.User).filter(models.User.email == email).first()
+            if not existing:
+                u = models.User(
+                    full_name=name,
+                    email=email,
+                    phone=phone,
+                    hashed_password=hash_password(pwd),
+                    role=role,
+                    is_verified=True,
+                )
+                db.add(u)
+                db.commit()
+                db.refresh(u)
+                if role == "agent":
+                    db.add(models.AgentProfile(user_id=u.id, vehicle_type="motorcycle"))
+                    db.commit()
 
         # Seed default settings
         defaults = [

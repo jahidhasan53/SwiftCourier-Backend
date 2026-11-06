@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
@@ -28,11 +28,6 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = None
     password: str
     role: str = "customer"
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
 
 
 class RefreshRequest(BaseModel):
@@ -114,36 +109,70 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
     access_token = create_access_token(user.id, user.role)
     refresh_token = create_refresh_token(user.id, db)
 
+    token_data = {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user": user_dict(user),
+    }
+
     return {
+        **token_data,
         "success": True,
-        "data": {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": user_dict(user),
-        },
+        "data": token_data,
     }
 
 
 @router.post("/login")
-def login(body: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == body.email).first()
-    if not user or not verify_password(body.password, user.hashed_password):
+async def login(request: Request, db: Session = Depends(get_db)):
+    email = None
+    password = None
+
+    # Support JSON payload (React Frontend)
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            email = body.get("email") or body.get("username")
+            password = body.get("password")
+        except Exception:
+            pass
+
+    # Support Form data (Swagger UI / OAuth2 form)
+    if not email or not password:
+        try:
+            form = await request.form()
+            email = form.get("username") or form.get("email")
+            password = form.get("password")
+        except Exception:
+            pass
+
+    if not email or not password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Email and password are required",
+        )
+
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     access_token = create_access_token(user.id, user.role)
     refresh_token = create_refresh_token(user.id, db)
 
+    token_data = {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user": user_dict(user),
+    }
+
     return {
+        **token_data,
         "success": True,
-        "data": {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": user_dict(user),
-        },
+        "data": token_data,
     }
 
 
@@ -176,14 +205,17 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     access_token = create_access_token(user.id, user.role)
     new_refresh = create_refresh_token(user.id, db)
 
+    token_data = {
+        "access_token": access_token,
+        "refresh_token": new_refresh,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    }
+
     return {
+        **token_data,
         "success": True,
-        "data": {
-            "access_token": access_token,
-            "refresh_token": new_refresh,
-            "token_type": "bearer",
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        },
+        "data": token_data,
     }
 
 
