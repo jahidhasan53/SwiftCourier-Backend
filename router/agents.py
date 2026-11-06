@@ -2,14 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from passlib.context import CryptContext
 
-from deps import get_db
+from deps import get_db, hash_password
 from router.auth import get_current_user
 import models
 
 router = APIRouter()
-bcrypt = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class UpdateAgentProfileRequest(BaseModel):
@@ -117,7 +115,7 @@ def create_agent(
         full_name=body.full_name,
         email=body.email,
         phone=body.phone,
-        hashed_password=bcrypt.hash(body.password),
+        hashed_password=hash_password(body.password),
         role="agent",
         is_verified=True,
     )

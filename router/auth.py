@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 from jose import jwt, JWTError
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import secrets
 
-from deps import get_db
+from deps import get_db, hash_password, verify_password
 import models
 
 router = APIRouter()
@@ -18,7 +17,6 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-bcrypt = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
@@ -50,14 +48,6 @@ class ForgotPasswordRequest(BaseModel):
 
 
 # ---------- Helpers ----------
-
-def hash_password(password: str) -> str:
-    return bcrypt.hash(password)
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.verify(plain, hashed)
-
 
 def create_access_token(user_id: int, role: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
