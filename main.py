@@ -1,3 +1,13 @@
+# Ensure passlib works with bcrypt 4.1.0+ and 5.0.0
+try:
+    import bcrypt
+    if not hasattr(bcrypt, "__about__"):
+        class _About:
+            __version__ = getattr(bcrypt, "__version__", "4.0.1")
+        bcrypt.__about__ = _About()
+except Exception:
+    pass
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, sessionLocal
@@ -34,7 +44,7 @@ def health():
 def seed_defaults():
     """Seed default admin user and platform settings on first run."""
     from passlib.context import CryptContext
-    bcrypt = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    bcrypt_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
     db = sessionLocal()
     try:
         # Seed admin
@@ -43,7 +53,7 @@ def seed_defaults():
                 full_name="Admin",
                 email="admin@swiftcourier.com",
                 phone="01700000000",
-                hashed_password=bcrypt.hash("Admin12345"),
+                hashed_password=bcrypt_ctx.hash("Admin12345"),
                 role="admin",
                 is_verified=True,
             ))
