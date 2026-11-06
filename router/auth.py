@@ -79,6 +79,7 @@ def user_dict(user: models.User) -> dict:
         "role": user.role,
         "is_active": user.is_active,
         "is_verified": user.is_verified,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
     }
 
 

@@ -21,6 +21,9 @@ def generate_tracking_number() -> str:
 
 def parcel_dict(p: models.Parcel) -> dict:
     status_val = p.status or "pending"
+    weight = p.parcel_weight or 1.0
+    charge = 60.0 + max(0.0, (weight - 1.0) * 20.0)
+
     return {
         "id": p.id,
         "tracking_number": p.tracking_number,
@@ -36,9 +39,11 @@ def parcel_dict(p: models.Parcel) -> dict:
         "parcel_weight": p.parcel_weight,
         "weight_kg": p.parcel_weight,
         "cod_amount": p.cod_amount or 0.0,
+        "delivery_charge": round(charge, 2),
         "status": status_val,
         "delivery_status": status_val,
         "created_by": p.created_by,
+        "agent_id": p.assigned_agent_id,
         "assigned_agent_id": p.assigned_agent_id,
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "updated_at": p.updated_at.isoformat() if p.updated_at else None,
@@ -130,8 +135,19 @@ def update_parcel_status(
 
     new_st = body.new_status or body.status
     if new_st:
+        prev_st = parcel.status
         parcel.status = new_st
         parcel.updated_at = datetime.now(timezone.utc)
+
+        # If marked delivered, credit agent
+        if new_st == "delivered" and prev_st != "delivered" and parcel.assigned_agent_id:
+            profile = db.query(models.AgentProfile).filter(
+                models.AgentProfile.user_id == parcel.assigned_agent_id
+            ).first()
+            if profile:
+                profile.total_deliveries = (profile.total_deliveries or 0) + 1
+                profile.total_earnings = (profile.total_earnings or 0.0) + 80.0
+
         db.commit()
         db.refresh(parcel)
 

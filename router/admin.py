@@ -27,6 +27,10 @@ def admin_dashboard(
     total_customers = db.query(models.User).filter(models.User.role == "customer").count()
     total_agents = db.query(models.User).filter(models.User.role == "agent").count()
     delivered = db.query(models.Parcel).filter(models.Parcel.status == "delivered").count()
+    pending = db.query(models.Parcel).filter(models.Parcel.status == "pending").count()
+    active_deliveries = db.query(models.Parcel).filter(
+        models.Parcel.status.in_(["in_transit", "picked_up", "out_for_delivery", "assigned"])
+    ).count()
     total_revenue = delivered * 60.0
 
     data = {
@@ -34,6 +38,9 @@ def admin_dashboard(
         "total_customers": total_customers,
         "total_agents": total_agents,
         "total_revenue": total_revenue,
+        "pending_parcels": pending,
+        "active_deliveries": active_deliveries,
+        "delivered_parcels": delivered,
     }
     return {
         **data,
